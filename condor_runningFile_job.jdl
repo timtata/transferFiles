@@ -1,0 +1,10 @@
+universe = vanilla
+Executable = worker.sh
+Should_Transfer_Files = YES
+WhenToTransferOutput = ON_EXIT_OR_EVICT
+Transfer_Input_Files = worker.sh,run_reco_energy.py
+Output = condor_runningFile_job.stdout
+Error = condor_runningFile_job.stderr
+Log = condor_runningFile_job.condor
+notification = never
+Queue

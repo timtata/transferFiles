@@ -1,0 +1,511 @@
+{
+  using namespace std;
+  TFile *_file0 = TFile::Open("myEnergyFile1.root"); 
+  TFile *_file1 = TFile::Open("myEnergyFileLarge1.root");
+  TFile *_file2 = TFile::Open("myEnergyFileLarge2.root");
+  
+ 
+  TCanvas *c1 = new TCanvas( "canvas" , "a" ,800,600);
+  c1->Divide(5,2);
+  gStyle->SetOptStat(0);  
+
+  vector<TH1*> energy_Response1, energy_Response2, energy_Response3, tracking, Response, simtrkstrResponse1, simtrkstrResponse2, simtrkstrResponse3, simtrkstr_regressed_Response, Tracking_Response, Lorentz_Response, trkstrResponse, trkstr_regressed_Response, ticlcand_Response, lyrClusterSum_Response ;
+  vector<TLegend*> Leg1,Leg2,Leg3,Leg4,Leg5,Leg6,Leg7,Leg8,Leg9,Leg10, Leg11, Leg12, Leg13;
+  vector<TString> eta_n = {"Lrg","Med","Sml"};
+  vector<int> pt_n  = {10,20,30,40,50,60,70,80,90,100,120,140,160,180,200,300,400,500,600,800,1000};
+  vector<double> mean1, mean2, mean3; 
+  vector<double> meanError1, meanError2, meanError3; 
+  vector<double> gauss1, gauss2, gauss3; 
+  vector<double> error1, error2, error3;
+  TString small = "Sml";
+  TString medium = "Med"; 
+  TString large = "Lrg"; 
+ 
+  for (TString  eta_i: eta_n){
+    for (int  pt_i: pt_n ){
+     
+      TH1 * h3a0 = (TH1*) _file0->Get("energy_"+small+"_"+to_string(pt_i).c_str());
+      TH1 * h3a1 = (TH1*) _file1->Get("energy_"+small+"_"+to_string(pt_i).c_str());
+      TH1 * h3a2 = (TH1*) _file2->Get("energy_"+small+"_"+to_string(pt_i).c_str());
+      
+      h3a0->Add(h3a1);
+      h3a0->Add(h3a2);
+      
+      //h3a0->Rebin(2);
+      simtrkstrResponse1.push_back(h3a0);
+
+      TH1 * h3b0 = (TH1*) _file0->Get("energy_"+medium+"_"+to_string(pt_i).c_str());
+      TH1 * h3b1 = (TH1*) _file1->Get("energy_"+medium+"_"+to_string(pt_i).c_str());
+      TH1 * h3b2 = (TH1*) _file2->Get("energy_"+medium+"_"+to_string(pt_i).c_str());
+            
+      h3b0->Add(h3b1);
+      h3b0->Add(h3b2);
+      
+      //h3b1->Rebin(2);      
+      simtrkstrResponse2.push_back(h3b0);
+
+      TH1 * h3c0 = (TH1*) _file0->Get("energy_"+large+"_"+to_string(pt_i).c_str());
+      TH1 * h3c1 = (TH1*) _file1->Get("energy_"+large+"_"+to_string(pt_i).c_str());
+      TH1 * h3c2 = (TH1*) _file2->Get("energy_"+large+"_"+to_string(pt_i).c_str());
+            
+      h3c0->Add(h3c1);
+      h3c0->Add(h3c2);
+      
+      //h3c0->Rebin(2);      
+      simtrkstrResponse3.push_back(h3c0);
+      
+    }
+  }
+
+  for (int i = 0; i < 15 ; i++){
+    /*TLegend* L1 = new TLegend(0.55,0.5,1.0,0.7);
+    L1->SetTextSize(0.035);
+    L1->AddEntry(tracking.at(i), "Tracking Response", "l");
+    L1->AddEntry((TObject*)0, TString::Format("Entries = %g", tracking.at(i)->GetEntries()), "");
+    L1->AddEntry((TObject*)0, TString::Format("Mean = %g",tracking.at(i)->GetMean()), "");
+    L1->AddEntry((TObject*)0, TString::Format("Std Dev  = %g", tracking.at(i)->GetStdDev()), "");
+    Leg1.push_back(L1);
+    */
+  }
+
+  int j = 1; 
+  int k = 0; 
+  
+  TString outname3= "EnergyRespResolution";
+  for (int i=0; i <=21; i++){
+    c1->cd(i+1);
+    simtrkstrResponse1.at(i)->Draw();
+    // simtrkstrResponse.at(i)->SetLineColor(2);
+    TF1 *f1 = new TF1("f1","gaus",0,2);
+    // set initial parameters (not really needed for gaus)
+    f1->SetParameters(simtrkstrResponse1.at(i)->GetMaximum(), simtrkstrResponse1.at(i)->GetMean(), simtrkstrResponse1.at(i)->GetRMS() ); 
+    simtrkstrResponse1.at(i)->Fit("f1");
+    cout << "Check" << endl;
+    TF1 *f1a = new TF1("f1a","gaus", (f1->GetParameter(1))-2*(simtrkstrResponse1.at(i)->GetRMS()),(f1->GetParameter(1))+2*(simtrkstrResponse1.at(i)->GetRMS()));
+    f1a->SetParameters(simtrkstrResponse1.at(i)->GetMaximum(), simtrkstrResponse1.at(i)->GetMean(), simtrkstrResponse1.at(i)->GetRMS() );
+    simtrkstrResponse1.at(i)->Fit("f1a");
+    int fitCount=0;
+
+    TF1 *f1b = new TF1("f1b","gaus", (f1a->GetParameter(1))-2*(f1a->GetParameter(2)),(f1a->GetParameter(1))+2*(f1a->GetParameter(2)));
+    // testing stuff for iterative fit
+    double chi2_test1  = f1a->GetChisquare();
+    double sigma_temp1 = f1a->GetParameter(2);
+    double mean_temp1  = f1a->GetParameter(1);
+    double chi2_temp1  = (chi2_test1);
+
+
+    while (chi2_temp1 <= chi2_test1 && fitCount<100){
+      chi2_test1 = chi2_temp1;
+      TF1 * dummy_fit1 = new TF1("dummy_fit1","gaus", mean_temp1-2*sigma_temp1, mean_temp1+2*sigma_temp1);
+      simtrkstrResponse1.at(i)->Fit("dummy_fit1");
+      sigma_temp1 = dummy_fit1->GetParameter(2);
+      mean_temp1 = dummy_fit1->GetParameter(1);
+      chi2_temp1 = dummy_fit1->GetChisquare();
+      fitCount+=1; 
+      delete dummy_fit1; 
+    }
+    TF1 * final_fit1 =new TF1("final_fit1","gaus", mean_temp1-2*sigma_temp1, mean_temp1+2*sigma_temp1);
+    simtrkstrResponse1.at(i)->Fit("final_fit1","R");
+    final_fit1->Draw("Sames");
+    mean1.push_back(final_fit1->GetParameter(1));
+    meanError1.push_back(final_fit1->GetParError(1));
+    gauss1.push_back(final_fit1->GetParameter(2)/final_fit1->GetParameter(1));
+    error1.push_back((final_fit1->GetParameter(2)/final_fit1->GetParameter(1))*sqrt(pow(final_fit1->GetParError(2)/final_fit1->GetParameter(2),2)+pow((final_fit1->GetParError(1)/final_fit1->GetParameter(1)),2)));
+   
+    //Leg3.at(i)->Draw("sames");
+  }
+  c1->SaveAs(outname3+(to_string(j).c_str())+".png");
+  c1->Clear();
+  gStyle->SetOptStat(0);
+  c1->Divide(5,2);
+   
+  j = 2; 
+  for (int i=0; i <=21; i++){
+    c1->cd(i+1);
+    simtrkstrResponse2.at(i)->Draw();
+    // simtrkstrResponse.at(i)->SetLineColor(2);
+    TF1 *f2 = new TF1("f2","gaus",0,2);
+    // set initial parameters (not really needed for gaus)
+    f2->SetParameters(simtrkstrResponse2.at(i)->GetMaximum(), simtrkstrResponse2.at(i)->GetMean(), simtrkstrResponse2.at(i)->GetRMS() ); 
+    simtrkstrResponse2.at(i)->Fit("f2","R");
+    TF1 *f2a = new TF1("f2a","gaus", (f2->GetParameter(1))-2*(simtrkstrResponse2.at(i)->GetRMS()),(f2->GetParameter(1))+2*(simtrkstrResponse2.at(i)->GetRMS()));
+    simtrkstrResponse2.at(i)->Fit("f2a");       
+    int fitCount=0;
+
+    TF1 *f2b = new TF1("f2b","gaus", (f2a->GetParameter(1))-2*(f2a->GetParameter(2)),(f2a->GetParameter(1))+2*(f2a->GetParameter(2)));
+    // testing stuff for iterative fit
+    double chi2_test2  = f2a->GetChisquare();
+    double sigma_temp2 = f2a->GetParameter(2);
+    double mean_temp2  = f2a->GetParameter(1);
+    double chi2_temp2  = (chi2_test2);
+
+
+    while (chi2_temp2 <= chi2_test2 && fitCount<100){
+      chi2_test2 = chi2_temp2;
+      TF1 * dummy_fit2 = new TF1("dummy_fit2","gaus", mean_temp2-2*sigma_temp2, mean_temp2+2*sigma_temp2);
+      simtrkstrResponse2.at(i)->Fit("dummy_fit2");
+      sigma_temp2 = dummy_fit2->GetParameter(2);
+      mean_temp2 = dummy_fit2->GetParameter(1);
+      chi2_temp2 = dummy_fit2->GetChisquare();
+      fitCount+=1; 
+      delete dummy_fit2; 
+    }
+    TF1 * final_fit2 =new TF1("final_fit2","gaus", mean_temp2-2*sigma_temp2, mean_temp2+2*sigma_temp2);
+    simtrkstrResponse2.at(i)->Fit("final_fit2","R");
+    final_fit2->Draw("Sames");
+    mean2.push_back(final_fit2->GetParameter(1));
+    meanError2.push_back(final_fit2->GetParError(1));
+    gauss2.push_back(final_fit2->GetParameter(2)/final_fit2->GetParameter(1));
+    error2.push_back((final_fit2->GetParameter(2)/final_fit2->GetParameter(1))*sqrt(pow(final_fit2->GetParError(2)/final_fit2->GetParameter(2),2)+pow((final_fit2->GetParError(1)/final_fit2->GetParameter(1)),2)));
+   
+  }
+ 
+  c1->SaveAs(outname3+(to_string(j).c_str())+".png");
+  c1->Clear();
+  gStyle->SetOptStat(0);
+  c1->Divide(5,2);
+   
+  j = 3; 
+
+  for (int i=0; i <=21; i++){
+    c1->cd(i+1);
+    simtrkstrResponse3.at(i)->Draw();
+    TF1 *f3 = new TF1("f3","gaus",0,2);
+    f3->SetParameters(simtrkstrResponse3.at(i)->GetMaximum(), simtrkstrResponse3.at(i)->GetMean(), simtrkstrResponse3.at(i)->GetRMS() ); 
+    simtrkstrResponse3.at(i)->Fit("f3");
+    TF1 *f3a = new TF1("f3a","gaus", (f3->GetParameter(1))-2*(f3->GetParameter(2)),(f3->GetParameter(1))+2*(f3->GetParameter(2)));
+    simtrkstrResponse3.at(i)->Fit("f3a");
+    int fitCount=0;
+    
+    double chi2_test3  = f3a->GetChisquare();
+    double sigma_temp3 = f3a->GetParameter(2);
+    double mean_temp3  = f3a->GetParameter(1);
+    double chi2_temp3  = (chi2_test3);
+
+    while (chi2_temp3 <= chi2_test3 && fitCount<100){
+      chi2_test3 = chi2_temp3;
+      TF1 * dummy_fit3 = new TF1("dummy_fit3","gaus", mean_temp3-2*sigma_temp3, mean_temp3+2*sigma_temp3);
+      simtrkstrResponse3.at(i)->Fit("dummy_fit3");
+      sigma_temp3 = dummy_fit3->GetParameter(2);
+      mean_temp3 = dummy_fit3->GetParameter(1);
+      chi2_temp3 = dummy_fit3->GetChisquare();
+      fitCount+=1; 
+      delete dummy_fit3; 
+    }
+    TF1 * final_fit3 =new TF1("final_fit3","gaus", mean_temp3-2*sigma_temp3, mean_temp3+2*sigma_temp3);
+    simtrkstrResponse3.at(i)->Fit("final_fit3","R");
+    final_fit3->Draw("Sames");
+    mean3.push_back(final_fit3->GetParameter(1));
+    meanError3.push_back(final_fit3->GetParError(1));
+    gauss3.push_back(final_fit3->GetParameter(2)/final_fit3->GetParameter(1));
+    error3.push_back((final_fit3->GetParameter(2)/final_fit3->GetParameter(1))*sqrt(pow(final_fit3->GetParError(2)/final_fit3->GetParameter(2),2)+pow((final_fit3->GetParError(1)/final_fit3->GetParameter(1)),2)));
+  }
+  c1->SaveAs(outname3+(to_string(j).c_str())+".png");
+  c1->Clear();
+  gStyle->SetOptStat(0);
+  c1->Divide(5,2);
+
+  
+  auto c2 = new TCanvas("c2","A Simple Graph with error bars",200,10,700,500);
+  c2->SetFillColor(0);
+  c2->SetGrid();
+  const Int_t n = 15;
+  Double_t x[n]  = {5,15,25,35,45,55,65,75,85,95,110,130,150,170,190};
+  Double_t y1[n]  = {gauss1.at(0),gauss1.at(1),gauss1.at(2),gauss1.at(3),gauss1.at(4),gauss1.at(5),gauss1.at(6),gauss1.at(7),gauss1.at(8),gauss1.at(9),gauss1.at(10),gauss1.at(11),gauss1.at(12),gauss1.at(13),gauss1.at(14)};
+  Double_t y2[n]  = {gauss2.at(0),gauss2.at(1),gauss2.at(2),gauss2.at(3),gauss2.at(4),gauss2.at(5),gauss2.at(6),gauss2.at(7),gauss2.at(8),gauss2.at(9),gauss2.at(10),gauss2.at(11),gauss2.at(12),gauss2.at(13),gauss2.at(14)};
+  Double_t y3[n]  = {gauss3.at(0),gauss3.at(1),gauss3.at(2),gauss3.at(3),gauss3.at(4),gauss3.at(5),gauss3.at(6),gauss3.at(7),gauss3.at(8),gauss3.at(9),gauss3.at(10),gauss3.at(11),gauss3.at(12),gauss3.at(13),gauss3.at(14)};
+  Double_t ex[n] = {0};
+  Double_t ey1[n] = {error1.at(0),error1.at(1),error1.at(2),error1.at(3),error1.at(4),error1.at(5),error1.at(6),error1.at(7),error1.at(8),error1.at(9),error1.at(10),error1.at(11),error1.at(12),error1.at(13),error1.at(14)};
+  Double_t ey2[n] = {error2.at(0),error2.at(1),error2.at(2),error2.at(3),error2.at(4),error2.at(5),error2.at(6),error2.at(7),error2.at(8),error2.at(9),error2.at(10),error2.at(11),error2.at(12),error2.at(13),error2.at(14)};
+  Double_t ey3[n] = {error3.at(0),error3.at(1),error3.at(2),error3.at(3),error3.at(4),error3.at(5),error3.at(6),error3.at(7),error3.at(8),error3.at(9),error3.at(10),error3.at(11),error3.at(12),error3.at(13),error3.at(14)};
+  auto gr1 = new TGraphErrors(n,x,y1,ex,ey1);
+  gr1->SetTitle("SimTrackster Response Resolution;Energy(GeV); #sigma/Mean");
+  gr1->GetYaxis()->SetRangeUser(0.05,0.35);
+  gr1->SetMarkerColor(1);
+  gr1->SetLineColor(1);
+  gr1->SetMarkerStyle(21);
+  gr1->Draw("ALP");
+  auto gr2 = new TGraphErrors(n,x,y2,ex,ey2);
+  gr2->GetYaxis()->SetRangeUser(0.05,0.35);
+  gr2->SetMarkerColor(2);
+  gr2->SetLineColor(2);
+  gr2->SetMarkerStyle(8);
+  gr2->Draw("Sames LP");
+  auto gr3 = new TGraphErrors(n,x,y3,ex,ey3);
+  gr3->GetYaxis()->SetRangeUser(0.05,0.35);
+  gr3->SetMarkerColor(4);
+  gr3->SetLineColor(4);
+  gr3->SetMarkerStyle(47);
+  gr3->Draw("Sames LP");
+  TF1 * fa1 = new TF1("fa1", "([0]/pow(x,0.5))+([1]/x)+[2]",1,190);
+  gr1->Fit("fa1", "R");
+  fa1->Draw("Sames L");
+  fa1->SetLineColor(1);
+  TF1 * fa2 = new TF1("fa2", "([0]/pow(x,0.5))+([1]/x)+[2]",1,190);
+  gr2->Fit("fa2", "R");
+  fa2->Draw("Sames L");
+  fa2->SetLineColor(2);
+  TF1 * fa3 = new TF1("fa3", "([0]/pow(x,0.5))+([1]/x)+[2]",1,190);
+  gr3->Fit("fa3", "R");
+  fa3->Draw("Sames L");
+  fa3->SetLineColor(4);
+  TLegend* L11 = new TLegend(0.7,0.7,0.9,0.9);
+  L11->SetTextSize(0.035);
+  L11->AddEntry(gr1, "Eta 1.6-2.1", "lep");
+  L11->AddEntry(gr2, "Eta 2.1-2.5", "lep");
+  L11->AddEntry(gr3, "Eta 2.5-2.8", "lep");
+  Leg11.push_back(L11);
+  Leg11.at(0)->Draw("Sames");
+  c2->SaveAs("EnergyResolution200.png");
+
+//
+
+
+
+
+
+
+  auto c3 = new TCanvas("c3","A Simple Graph with error bars");
+  c3->SetFillColor(0);
+  c3->SetGrid();
+  const Int_t n2 = 6;
+  Double_t x2[n2]  = {250,350,450,550,700,900};
+  Double_t y4[n2]  = {gauss1.at(15),gauss1.at(16),gauss1.at(17),gauss1.at(18),gauss1.at(19),gauss1.at(20)};
+  Double_t y5[n2]  = {gauss2.at(15),gauss2.at(16),gauss2.at(17),gauss2.at(18),gauss2.at(19),gauss2.at(20)};
+  Double_t y6[n2]  = {gauss3.at(15),gauss3.at(16),gauss3.at(17),gauss3.at(18),gauss3.at(19),gauss3.at(20)};
+  Double_t ey4[n2] = {error1.at(15),error1.at(16),error1.at(17),error1.at(18),error1.at(19),error1.at(20)};
+  Double_t ey5[n2] = {error2.at(15),error2.at(16),error2.at(17),error2.at(18),error2.at(19),error2.at(20)};
+  Double_t ey6[n2] = {error3.at(15),error3.at(16),error3.at(17),error3.at(18),error3.at(19),error3.at(20)};
+  auto gr4 = new TGraphErrors(n2,x2,y4,ex,ey4);
+  gr4->SetTitle("SimTrackster Response Resolution;Energy(GeV); #sigma/Mean");
+  gr4->GetYaxis()->SetRangeUser(0.0,0.1);
+  gr4->SetMarkerColor(1);
+  gr4->SetLineColor(1);
+  gr4->SetMarkerStyle(21);
+  gr4->Draw("ALP");
+  auto gr5 = new TGraphErrors(n2,x2,y5,ex,ey5);
+  gr5->GetYaxis()->SetRangeUser(0.0,0.1);
+  gr5->SetMarkerColor(2);
+  gr5->SetLineColor(2);
+  gr5->SetMarkerStyle(8);
+  gr5->Draw("Sames LP");
+  auto gr6 = new TGraphErrors(n2,x2,y6,ex,ey6);
+  gr6->GetYaxis()->SetRangeUser(0.0,0.1);
+  gr6->SetMarkerColor(4);
+  gr6->SetLineColor(4);
+  gr6->SetMarkerStyle(47);
+  gr6->Draw("Sames LP");
+  TF1 * fb1 = new TF1("fb1", "([0]/pow(x,0.5))+([1]/x)+[2]",250,950);
+  gr4->Fit("fb1", "R");
+  fb1->Draw("Sames L");
+  fb1->SetLineColor(1);
+  TF1 * fb2 = new TF1("fb2", "([0]/pow(x,0.5))+([1]/x)+[2]",250,950);
+  gr5->Fit("fb2", "R");
+  fb2->Draw("Sames L");
+  fb2->SetLineColor(2);
+  TF1 * fb3 = new TF1("fb3", "([0]/pow(x,0.5))+([1]/x)+[2]",250,950);
+  gr6->Fit("fb3", "R");
+  fb3->Draw("Sames L");
+  fb3->SetLineColor(4);
+  TLegend* L12 = new TLegend(0.7,0.7,0.9,0.9);
+  L12->SetTextSize(0.035);
+  L12->AddEntry(gr4, "Eta 1.6-2.1", "lep");
+  L12->AddEntry(gr5, "Eta 2.1-2.5", "lep");
+  L12->AddEntry(gr6, "Eta 2.5-2.8", "lep");
+  Leg12.push_back(L12);
+  Leg12.at(0)->Draw("Sames");
+  c3->SaveAs("EnergyResolution1000.png");
+
+  //
+
+auto c4 = new TCanvas("c4","A Simple Graph with error bars");
+  c4->SetFillColor(0);
+  c4->SetGrid();
+  const Int_t n3 = 21;
+  Double_t x3[n3]  = {5,15,25,35,45,55,65,75,85,95,110,130,150,170,190,250,350,450,550,700,900};
+  Double_t y7[n3]  = {gauss1.at(0),gauss1.at(1),gauss1.at(2),gauss1.at(3),gauss1.at(4),gauss1.at(5),gauss1.at(6),gauss1.at(7),gauss1.at(8),gauss1.at(9),gauss1.at(10),gauss1.at(11),gauss1.at(12),gauss1.at(13),gauss1.at(14),gauss1.at(15),gauss1.at(16),gauss1.at(17),gauss1.at(18),gauss1.at(19),gauss1.at(20)};
+  Double_t y8[n3]  = {gauss2.at(0),gauss2.at(1),gauss2.at(2),gauss2.at(3),gauss2.at(4),gauss2.at(5),gauss2.at(6),gauss2.at(7),gauss2.at(8),gauss2.at(9),gauss2.at(10),gauss2.at(11),gauss2.at(12),gauss2.at(13),gauss2.at(14),gauss2.at(15),gauss2.at(16),gauss2.at(17),gauss2.at(18),gauss2.at(19),gauss2.at(20)};
+  Double_t y9[n3]  = {gauss3.at(0),gauss3.at(1),gauss3.at(2),gauss3.at(3),gauss3.at(4),gauss3.at(5),gauss3.at(6),gauss3.at(7),gauss3.at(8),gauss3.at(9),gauss3.at(10),gauss3.at(11),gauss3.at(12),gauss3.at(13),gauss3.at(14),gauss3.at(15),gauss3.at(16),gauss3.at(17),gauss3.at(18),gauss3.at(19),gauss3.at(20)};
+  Double_t ey7[n3] = {error1.at(0),error1.at(1),error1.at(2),error1.at(3),error1.at(4),error1.at(5),error1.at(6),error1.at(7),error1.at(8),error1.at(9),error1.at(10),error1.at(11),error1.at(12),error1.at(13),error1.at(14),error1.at(15),error1.at(16),error1.at(17),error1.at(18),error1.at(19),error1.at(20)};
+  Double_t ey8[n3] = {error2.at(0),error2.at(1),error2.at(2),error2.at(3),error2.at(4),error2.at(5),error2.at(6),error2.at(7),error2.at(8),error2.at(9),error2.at(10),error2.at(11),error2.at(12),error2.at(13),error2.at(14),error2.at(15),error2.at(16),error2.at(17),error2.at(18),error2.at(19),error2.at(20)};
+  Double_t ey9[n3] = {error3.at(0),error3.at(1),error3.at(2),error3.at(3),error3.at(4),error3.at(5),error3.at(6),error3.at(7),error3.at(8),error3.at(9),error3.at(10),error3.at(11),error3.at(12),error3.at(13),error3.at(14),error3.at(15),error3.at(16),error3.at(17),error3.at(18),error3.at(19),error3.at(20)};
+  auto gr7 = new TGraphErrors(n3,x3,y7,ex,ey7);
+  gr7->SetTitle("SimTrackster Response Resolution;Energy(GeV); #sigma/Mean");
+  gr7->GetYaxis()->SetRangeUser(0.0,0.3);
+  gr7->SetMarkerColor(1);
+  gr7->SetLineColor(1);
+  gr7->SetMarkerStyle(21);
+  gr7->Draw("ALP");
+  auto gr8 = new TGraphErrors(n3,x3,y8,ex,ey8);
+  gr8->GetYaxis()->SetRangeUser(0.0,0.3);
+  gr8->SetMarkerColor(2);
+  gr8->SetLineColor(2);
+  gr8->SetMarkerStyle(8);
+  gr8->Draw("Sames LP");
+  auto gr9 = new TGraphErrors(n3,x3,y9,ex,ey9);
+  gr9->GetYaxis()->SetRangeUser(0.0,0.3);
+  gr9->SetMarkerColor(4);
+  gr9->SetLineColor(4);
+  gr9->SetMarkerStyle(47);
+  gr9->Draw("Sames LP");
+  TF1 * fc1 = new TF1("fc1", "([0]/pow(x,0.5))+([1]/x)+[2]",5,950);
+  gr7->Fit("fc1", "R");
+  fc1->Draw("Sames L");
+  fc1->SetLineColor(1);
+  TF1 * fc2 = new TF1("fc2", "([0]/pow(x,0.5))+([1]/x)+[2]",5,950);
+  gr8->Fit("fc2", "R");
+  fc2->Draw("Sames L");
+  fc2->SetLineColor(2);
+  TF1 * fc3 = new TF1("fc3", "([0]/pow(x,0.5))+([1]/x)+[2]",5,950);
+  gr9->Fit("fc3", "R");
+  fc3->Draw("Sames L");
+  fc3->SetLineColor(4);
+  TLegend* L13 = new TLegend(0.7,0.7,0.9,0.9);
+  L13->SetTextSize(0.035);
+  L13->AddEntry(gr7, "Eta 1.6-2.1", "lep");
+  L13->AddEntry(gr8, "Eta 2.1-2.5", "lep");
+  L13->AddEntry(gr9, "Eta 2.5-2.8", "lep");
+  Leg13.push_back(L13);
+  Leg13.at(0)->Draw("Sames");
+  c4->SaveAs("EnergyResolutionFull.png");
+
+  /*
+  TCanvas *c3 = new TCanvas( "c3" , "b" ,800,600);
+  c3->Divide(5,2);
+  gStyle->SetOptStat(0);  
+
+  cout << "Test2" << endl;
+
+  j = 1; 
+  TString outname4 = "EnergyResp";
+  for (int i=0; i <=9; i++){
+    c3->cd(i+1);
+    cout<<"asdfasdf"<<endl;
+    energy_Response1.at(i)->Draw();
+    cout <<"sadf"<<endl;
+    TF1 *f4 = new TF1("f4","gaus",0,2);
+    f4->SetParameters(energy_Response1.at(i)->GetMaximum(), energy_Response1.at(i)->GetMean(), energy_Response1.at(i)->GetRMS() ); 
+    energy_Response1.at(i)->Fit("f4");
+    egauss1.push_back(f4->GetParameter(2)/f4->GetParameter(1));
+    eerror1.push_back((f4->GetParameter(2)/f4->GetParameter(1))*sqrt(pow(f4->GetParError(2)/f4->GetParameter(2),2)+pow((f4->GetParError(1)/f4->GetParameter(1)),2)));
+    f4->Draw("Sames");
+  }
+  c3->SaveAs(outname4+(to_string(j).c_str())+".png");
+  c3->Clear();
+  gStyle->SetOptStat(0);
+  c3->Divide(5,2);
+  cout << "Check1" << endl;
+   
+  j = 2; 
+  for (int i=0; i <=9; i++){
+    c3->cd(i+1);
+    energy_Response2.at(i)->Draw();
+    TF1 *f5 = new TF1("f5","gaus",0,2);
+    f5->SetParameters(energy_Response2.at(i)->GetMaximum(), energy_Response2.at(i)->GetMean(), energy_Response2.at(i)->GetRMS() ); 
+    energy_Response2.at(i)->Fit("f5");
+    egauss2.push_back(f5->GetParameter(2)/f5->GetParameter(1));
+    eerror2.push_back((f5->GetParameter(2)/f5->GetParameter(1))*sqrt(pow(f5->GetParError(2)/f5->GetParameter(2),2)+pow((f5->GetParError(1)/f5->GetParameter(1)),2)));
+    f5->Draw("Sames");
+  }
+  c3->SaveAs(outname4+(to_string(j).c_str())+".png");
+  c3->Clear();
+  gStyle->SetOptStat(0);
+  c3->Divide(5,2);
+  cout << "Check2" << endl;
+   
+  j = 3; 
+
+  
+
+  auto c4 = new TCanvas("c4","",200,10,700,500);
+  c4->SetFillColor(0);
+  c4->SetGrid();
+  Double_t x1[n]  = {10,30,50,70,90};
+  Double_t y4[n]  = {egauss1.at(0),egauss1.at(1),egauss1.at(2),egauss1.at(3),egauss1.at(4),egauss1.at(5),egauss1.at(6),egauss1.at(7),egauss1.at(8),egauss1.at(9)};
+  Double_t y5[n]  = {egauss2.at(0),egauss2.at(1),egauss2.at(2),egauss2.at(3),egauss2.at(4),egauss2.at(5),egauss2.at(6),egauss2.at(7),egauss2.at(8),egauss2.at(9)};
+  Double_t y6[n]  = {egauss3.at(0),egauss3.at(1),egauss3.at(2),egauss3.at(3),egauss3.at(4),egauss3.at(5),egauss3.at(6),egauss3.at(7),egauss3.at(8),egauss3.at(9)};
+  cout <<"another check" << endl;
+  Double_t ey4[n] = {eerror1.at(0),eerror1.at(1),eerror1.at(2),eerror1.at(3),eerror1.at(4),eerror1.at(5),eerror1.at(6),eerror1.at(7),eerror1.at(8),eerror1.at(9)};
+  Double_t ey5[n] = {eerror2.at(0),eerror2.at(1),eerror2.at(2),eerror2.at(3),eerror2.at(4),eerror2.at(5),eerror2.at(6),eerror2.at(7),eerror2.at(8),eerror1.at(9)};
+  Double_t ey6[n] = {eerror3.at(0),eerror3.at(1),eerror3.at(2),eerror3.at(3),eerror3.at(4),eerror3.at(5),eerror3.at(6),eerror3.at(7),eerror3.at(8),eerror1.at(9)};
+  
+
+ auto gr4 = new TGraphErrors(n,x1,y4,ex,ey4);
+  gr4->SetTitle("SimTrackster Energy Response;genPar Energy; #sigma/Mean");
+  gr4->GetYaxis()->SetRangeUser(0.0,0.4);
+  gr4->SetMarkerColor(1);
+  gr4->SetLineColor(1);
+  gr4->SetMarkerStyle(21);
+  gr4->Draw("ACP");
+  auto gr5 = new TGraphErrors(n,x1,y5,ex,ey5);
+  gr5->GetYaxis()->SetRangeUser(0.0,0.4);
+  gr5->SetMarkerColor(2);
+  gr5->SetLineColor(2);
+  gr5->SetMarkerStyle(8);
+  gr5->Draw("Sames LCP");
+  auto gr6 = new TGraphErrors(n,x1,y6,ex,ey6);
+  gr6->GetYaxis()->SetRangeUser(0.0,0.4);
+  gr6->SetMarkerColor(4);
+  gr6->SetLineColor(4);
+  gr6->SetMarkerStyle(47);
+  gr6->Draw("Sames LCP");
+  TLegend* L12 = new TLegend(0.7,0.7,0.9,0.9);
+  L12->SetTextSize(0.035);
+  L12->AddEntry(gr4, "Eta 1.6-2.1", "lep");
+  L12->AddEntry(gr5, "Eta 2.1-2.5", "lep");
+  L12->AddEntry(gr6, "Eta 2.5-3.0", "lep");
+  Leg12.push_back(L12);
+  Leg12.at(0)->Draw("Sames");
+  c4->SaveAs("EnergyResolution.png");
+
+  */
+  //
+
+  /*
+  auto c5 = new TCanvas("c5","A Simple Graph with error bars",200,10,700,500);
+  c5->SetFillColor(0);
+  c5->SetGrid();
+  Double_t y7[n]  = {mean1.at(0),mean1.at(1),mean1.at(2),mean1.at(3),mean1.at(4),mean1.at(5),mean1.at(6),mean1.at(7),mean1.at(8),mean1.at(9)};
+  Double_t y8[n]  = {mean2.at(0),mean2.at(1),mean2.at(2),mean2.at(3),mean2.at(4),mean2.at(5),mean2.at(6),mean2.at(7),mean2.at(8),mean2.at(9)};
+  Double_t y9[n]  = {mean3.at(0),mean3.at(1),mean3.at(2),mean3.at(3),mean3.at(4),mean3.at(5),mean3.at(6),mean3.at(7),mean3.at(8),mean3.at(9)};
+  Double_t ey7[n] = {meanError1.at(0),meanError1.at(1),meanError1.at(2),meanError1.at(3),meanError1.at(4),meanError1.at(5),meanError1.at(6),meanError1.at(7),meanError1.at(8),meanError1.at(9)};
+  Double_t ey8[n] = {meanError2.at(0),meanError2.at(1),meanError2.at(2),meanError2.at(3),meanError2.at(4),meanError2.at(5),meanError2.at(6),meanError2.at(7),meanError2.at(8),meanError1.at(9)};
+  Double_t ey9[n] = {meanError3.at(0),meanError3.at(1),meanError3.at(2),meanError3.at(3),meanError3.at(4),meanError3.at(5),meanError3.at(6),meanError3.at(7),meanError3.at(8),meanError1.at(9)};
+  auto gr7 = new TGraphErrors(n,x,y7,ex,ey7);
+  gr7->SetTitle("Gaussian Mean of pT Response;pT; Mean Response Value");
+  gr7->GetYaxis()->SetRangeUser(0,1);
+  gr7->SetMarkerColor(1);
+  gr7->SetLineColor(1);
+  gr7->SetMarkerStyle(21);
+  gr7->Draw("ALP");
+  auto gr8 = new TGraphErrors(n,x,y8,ex,ey8);
+  gr8->GetYaxis()->SetRangeUser(0,1);
+  gr8->SetMarkerColor(2);
+  gr8->SetLineColor(2);
+  gr8->SetMarkerStyle(8);
+  gr8->Draw("Sames LP");
+  auto gr9 = new TGraphErrors(n,x,y9,ex,ey9);
+  gr9->GetYaxis()->SetRangeUser(0,1);
+  gr9->SetMarkerColor(4);
+  gr9->SetLineColor(4);
+  gr9->SetMarkerStyle(47);
+  gr9->Draw("Sames LP");
+
+ 
+  TLegend* L13 = new TLegend(0.7,0.2,0.9,0.5);
+  L13->SetTextSize(0.035);
+  L13->AddEntry(gr7, "Eta 1.6-2.1", "lep");
+  L13->AddEntry(gr8, "Eta 2.1-2.5", "lep");
+  L13->AddEntry(gr9, "Eta 2.5-2.8", "lep");
+  Leg13.push_back(L13);
+  Leg13.at(0)->Draw("Sames");
+  
+  c5->SaveAs("MeanEnergyRes.png");
+  */
+  cout << endl;
+  cout << "A1: "<<fc1->GetParameter(0) << "  B: " << fc1->GetParameter(1) << "  C: " << fc1->GetParameter(2) <<  endl; 
+  cout << "A2: "<<fc2->GetParameter(0) << "  B: " << fc2->GetParameter(1) << "  C: " << fc2->GetParameter(2) <<  endl; 
+  cout << "A3: "<<fc3->GetParameter(0) << "  B: " << fc3->GetParameter(1) << "  C: " << fc3->GetParameter(2) <<  endl; 
+  
+
+};

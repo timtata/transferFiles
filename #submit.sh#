@@ -1,0 +1,24 @@
+filesToTransfer=""
+Executable=worker.sh
+jdl_file="condor_runningFile_job.jdl"
+log_prefix="condor_runningFile_job"
+echo "universe = vanilla">$jdl_file
+echo "Executable = worker.sh">>$jdl_file
+echo "Should_Transfer_Files = YES">>$jdl_file
+echo "WhenToTransferOutput = ON_EXIT_OR_EVICT">>$jdl_file
+echo "Transfer_Input_Files = ${filesToTransfer}">>$jdl_file
+echo "Output = ${log_prefix}.stdout">>$jdl_file
+echo "Error = ${log_prefix}.stderr">>$jdl_file
+echo "Log = ${log_prefix}.condor">>$jdl_file
+echo "notification = never">>$jdl_file
+echo "Arguments = run_reco_energy.py">>$jdl_file
+echo "Queue">>$jdl_file
+condor_submit $jdl_file
+28 echo "Setting up CMSSW....................."
+29 source /cvmfs/cms.cern.ch/cmsset_default.sh
+30 export SCRAM_ARCH=slc7_amd64_gcc700
+31 cmsrel CMSSW_12_0_0_pre3
+32 cd CMSSW_12_0_0_pre3/src
+33 cmsenv
+36 scram b clean
+37 scram b -j4
